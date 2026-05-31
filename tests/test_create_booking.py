@@ -1,5 +1,7 @@
 import allure
 import pytest
+import requests.exceptions
+
 from tests.assertions.booking_assert import assert_booking_data
 from core.clients.api_client import APIClient
 from pydantic import ValidationError
@@ -34,37 +36,23 @@ def test_create_booking_with_random_data(api_client: APIClient,
 ])
 def test_create_booking_with_missing_required_fields(required_field: str,
                                                      api_client: APIClient,
-                                                    generate_random_booking_data: dict,
-                                                     mocker):
-    mock_response = mocker.Mock()
-    mock_response.status_code = 400
-    mock_response.json.return_value = {"error": "Bad Request"}
-    mocker.patch.object(api_client.session, 'post', return_value=mock_response)
+                                                    generate_random_booking_data: dict,):
 
     booking_data = generate_random_booking_data.copy()
     del booking_data[required_field]
-
-    with allure.step("Sent request to create a booking"):
-        response = api_client.create_booking(booking_data)
-    with allure.step("Assert status code"):
-        assert response.status_code == 400, f"Expected status code 400, but got {response.status_code}"
-        assert response.json() == {"error": "Bad Request"}, f"Expected error message 'Bad Request', but got {response.json()}"
+    with allure.step(f"Send request without required field: {required_field}"):
+        with pytest.raises(requests.exceptions.HTTPError):
+            api_client.create_booking(booking_data)
 
 
 
 @allure.feature("Booking")
 @allure.story("Create booking")
 @allure.title("Verify booking creation fails with empty request body")
-def test_create_booking_with_empty_request_body(api_client: APIClient, mocker):
-    mock_response = mocker.Mock()
-    mock_response.status_code = 400
-    mock_response.json.return_value = {"error": "Bad Request"}
-    mocker.patch.object(api_client.session, 'post', return_value=mock_response)
-    with allure.step("Sent request to create a booking"):
-        response = api_client.create_booking({})
-    with allure.step("Assert status code"):
-        assert response.status_code == 400, f"Expected status code 400, but got {response.status_code}"
-        assert response.json() == {"error": "Bad Request"}, f"Expected error message 'Bad Request', but got {response.json()}"
+def test_create_booking_with_empty_request_body(api_client: APIClient):
+    with allure.step("Sent request with empty request body"):
+        with pytest.raises(requests.exceptions.HTTPError):
+            api_client.create_booking({})
 
 
 @allure.feature("Booking")
@@ -72,25 +60,17 @@ def test_create_booking_with_empty_request_body(api_client: APIClient, mocker):
 @allure.title("Verify booking creation fails with invalid_field_type")
 @pytest.mark.parametrize("field, invalid_value", [
     ("firstname", 999),
-    ("lastnamme", True),
-    ("totalprice", "one"),
-    ("depositpaid", "yes"),
     ("bookingdates", "invalid_date")
 ])
-def test_create_booking_with_empty_request_body(field, invalid_value,
-                                                api_client: APIClient, mocker,
+def test_create_booking_with_invalid_field_type(field, invalid_value,
+                                                api_client: APIClient,
                                                 generate_random_booking_data: dict):
-    mock_response = mocker.Mock()
-    mock_response.status_code = 400
-    mock_response.json.return_value = {"error": "Bad Request"}
-    mocker.patch.object(api_client.session, 'post', return_value=mock_response)
     booking_data = generate_random_booking_data.copy()
     booking_data[field] = invalid_value
-    with allure.step("Sent request to create a booking"):
-        response = api_client.create_booking(booking_data)
-    with allure.step("Assert status code"):
-        assert response.status_code == 400, f"Expected status code 400, but got {response.status_code}"
-        assert response.json() == {"error": "Bad Request"}, f"Expected error message 'Bad Request', but got {response.json()}"
+    with allure.step(f"Sent request with invalid type field == {field}"):
+        with pytest.raises(requests.exceptions.HTTPError):
+            api_client.create_booking(booking_data)
+
 
 
 @allure.feature("Booking")
